@@ -1,0 +1,11 @@
+{
+  "name": "webpack2-keynote",
+  "version": "1.0.0",
+  "description": "Webpack 升职记 -- 中心化 webpack1.x 迁移到 webpack2",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "cntchen",
+  "license": "ISC"
+}

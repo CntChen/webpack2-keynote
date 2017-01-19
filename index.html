@@ -1,0 +1,431 @@
+<html>
+
+<head>
+  <title>Webpack 升职记</title>
+  <link rel="stylesheet" href="./reveal/css/reveal.css">
+  <link rel="stylesheet" href="./reveal/css/theme/simple.css">
+  <style>
+    .left {
+      width: 50%;
+      float: left;
+    }
+    
+    .right {
+      width: 50%;
+      float: right;
+    }
+
+    .slides{
+      width: 1200px !important;
+    }
+    
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+      text-transform: none!important;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="reveal">
+    <div class="slides">
+      <section data-markdown>
+        <script type="text/template">
+          # Webpack 升职记
+          ###  中心化 webpack1.x 迁移到 [`webpack2`](https://webpack.js.org/)
+          **2017-01-18  [@CntChen](https://github.com/CntChen)**
+        </script>
+      </section>
+      <section data-markdown>
+        <script type="text/template">
+          ## 目录
+          * Webpack 概念简介
+          * Webpack2 特性
+          * 中心化构建流程梳理
+          * 升级到 webpack2
+          * 存在的问题和后续工作
+        </script>
+      </section>
+      <section>
+        <section data-markdown>
+          <script type="text/template">
+            ### Webpack 概念简介
+            ![what-is-webpack](./sources/img/what-is-webpack.png)
+          </script>       
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### Webpack 是什么
+            > webpack is a module bundler for modern JavaScript applications.<br>
+
+            * Module(模块)
+             * 源码（**sources**）中的一个资源（asset）
+
+            *  Bundle(打包)
+             * 模块依赖（**require**等语法），webpack 可以生成**Dependency Graph**(依赖图谱)
+             * 打包为 JS, HTML, CSS 也打包为可执行代码
+
+            * Run in Browser
+             * JS 可以操作 DOM，处理 HTML
+             * JS 添加**style**标签，内联样式
+          </script>     
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### Webpack 有什么用
+            * 前端开发工程化 (compilation,tramsform)
+            * 编写模块化的代码
+            * 进行语法转义
+            * 分块，按需加载，缓存
+          </script>     
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### Webpack 主要概念
+            参考：https://webpack.js.org/concepts/
+            * Entry， Output， Loader， Plugin
+            * webpack.config.js 配置的主要内容
+            
+            ```js
+            var path = require("path");
+
+            module.exports = {
+                entry: {
+                  'require-test': './src/require-test.js',
+                  'require-ensure-test': './src/require-ensure-test.js'
+                },
+                output: {
+                    path: path.join(__dirname, "dist"),
+                    filename: "[name].js",
+                    chunkFilename: "js/[name].js"
+                },
+                rules: [{
+                  test: /.less$/,
+                  use: ['style-laoder', 'css-loader', 'less-loader'],
+                }],
+                plugins: [
+                  new WebpackMd5Hash(),
+               ],
+                recordsOutputPath: path.join(__dirname, "dist", "records.json")
+            };
+            ```
+          </script>     
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### Webpack 主要概念
+
+            * Entry(依赖入口)
+             * Dependency Graph 的 starting point
+             * 可以有多个 entry
+
+            * Output(打包输出)
+             * 处理打包后的代码，输出为文件
+             * 每个 Entry 至少对应一个输出
+             * 名称解释： Output Bundles, Chunks(分块)
+          </script>     
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### Webpack 主要概念
+
+            * Loader
+             * 归一化 assets，对 dependency graph 的所有 assets 转换为 webpack 的 modules
+             * Functions run in Node.js
+
+            ```
+            node_modules/extract-text-webpack-plugin/loader.js?{"id":1,"omit":1,"remove":true}!node_modules/style-loader/index.js!node_modules/css-loader/index.js!node_modules/postcss-loader/index.js!node_modules/px2rem-loader/index.js?remUnit=64&remPrecision=8!node_modules/less-loader/index.js!src/components/CaptchaDialog/index.less
+            ```
+            <br>
+            * 常见 loaders <br>
+            less-loader, style-loader, babel-loader, url-loader, jpeg-loader
+          </script>     
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### Webpack 主要概念
+
+            * Plugin
+             * 对整个 compilations 和 chunks 进行额外处理
+             * hook Funtion
+
+             * 常见 plugins <br>
+              参考：https://webpack.js.org/plugins/define-plugin/
+               * `provide-plugin` 在每个模块中插入预定义的模块
+               * `define-plugin` 创建 compile 时可以配置的全局常量
+               * `extract-text-webpack-plugin` 抽离 CSS 代码
+               * `CommonsChunkPlugin` 相同代码抽离
+          </script>     
+        </section>
+      </section>
+      <section>
+        <section data-markdown>
+          <script type="text/template">
+            ## Webpack2 特性
+            参考： [What's new in webpack 2](https://gist.github.com/sokra/27b24881210b56bbaff7)
+            * 支持原生的`ES6 Modules`
+            * 基于`ES6 Modules static`的优化(`Tree Shaking`)
+            * 代替`require.ensure`的`System.import`
+            * 分片打包(Code Splitting and Bundling)        
+            * 配置文件写法的优化
+            * loader 不能访问全局配置
+          </script>     
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+              ### Tree Shaking
+              参考：[Webpack 2 Tree Shaking Configuration](https://moduscreate.com/webpack-2-tree-shaking-configuration/)
+              * 实现流程 -- [分两步走](http://www.2ality.com/2015/12/webpack-tree-shaking.html)：
+               * 没有被外部`import`的`export`，将不再`export`
+               * 没有被使用的`dead code`将被移除
+
+              * 提示
+               * 模块(私有模块和第三方模块)需要使用`ES6 Modules`的写法编写
+               * 一些第三方库使用了`ES6`语法，但是已经做了`transpilation`，那就变成`CommonJS Module`，无法做`Tree Shaking`
+            </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+                ### Code Splitting and Bundling
+                参考：[webpack & HTTP/2](https://medium.com/webpack/webpack-http-2-7083ec3f3ce6#.dtpplunok)
+                * 新概念
+                 * With HTTP/2 you don’t need to bundle your modules anymore.
+                 * More bundles means better caching, but less compression.
+
+                * 目标
+                 * 兼容 HTTP1.x
+                 * 更高的压缩效率
+
+                #### 分片打包
+                * chunksCount >= 1 && chunksCount >= assetsCount
+            </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+                ### 分chunk机制
+                * 基于`Webpack2`，使用`AggressiveSplittingPlugin`
+                * 在拆分和合并模块时，先对`modules`路径使用字母排序
+                * 对打包结果进行hash缓存，源码更新后，尽量复用上一次打包的chunks，这样浏览器也可以做到缓存
+                * 太小的 chunk 不记录，用于合并新 chunk
+
+                ```
+                new webpack.optimize.AggressiveSplittingPlugin({
+                  minSize: 30000,
+                  maxSize: 50000
+                }),
+                ```
+            </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+          ### HTML 引用机制
+          * `HTML`文件引用的js不再是一个，而是多个`chunks`，这些`chunks`的引用顺序是**order of age**
+          * order of age<br>
+          旧的chunks先引用，更可能直接取缓存，然后执行；执行中等待新的chunks传输完成。
+          * `HTTP/2 Server push`先 push 新的 chunks<br>
+          因为旧的 chunks 可能已经被 cache 了，不需要再发送。
+
+          * HTML示例
+          ```
+          <tpircs src="1ea296932eacbe248905.js"></tpircs>
+          <tpircs src="0b3a074667143853404c.js"></tpircs>
+          <tpircs src="0dd8c061aff2a2791815.js"></tpircs>
+          <tpircs src="191b812fa5f7504151f7.js"></tpircs>
+          <tpircs src="08702f45497539ef6ea6.js"></tpircs>
+          <tpircs src="195c9326275620b0e9c2.js"></tpircs>
+          ```
+            </script>
+        </section>
+      </section>
+      <section>
+        <section data-markdown>
+          <script type="text/template">
+          ## 中心化构建流程
+          * Gulp + Webpack
+          ![中心化构建流程](./sources/img/中心化构建流程.png)
+
+          * Webpack1.13.2
+          * HTML独立处理，不在 Webpack 中打包
+            </script>
+        </section>
+      </section>
+      <section> 
+        <section data-markdown>
+          <script type="text/template">
+            ## 升级到 Webpack2
+          </script>
+        </section>  
+        <section data-markdown>
+          <script type="text/template">
+            ### 升级策略 -- 渐进增强
+            * 剥离`gulp`中与`webpack`无关的 tasks
+            * 停用非关键的耗时步骤如`hash`，`uglify`，`sourcemap`等
+            * ~~只保留少量的源码来测试各种构建~~[构建时间～25s，不需要了]
+            * 依赖包逐渐升级
+            * 配置文件逐步更新到 webpack2
+            * 每一步使用`git`来控制版本
+          </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### 整理构建过程
+            * 构建指令**gulp prod:wechat**
+            * 设置 webpack`config.output`不使用 `hash`
+            * 设置 webpack`config.output`不生成 `sourcemap`
+            * 修改`tasks/after-webpack.js`,不 `uglify`
+            * 打开本地服务器，测试代码正确性
+          </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### 升级到 Webpack2.2.0-rc4
+            * 安装
+            ```
+            $ npm install webpack@2.2.0-rc.4 --registry=https://registry.npm.taobao.org
+            ```
+            * 报了一堆结对依赖（peer dep）错误
+            ```
+            npm ERR! peer dep missing: webpack@^1.9.11, required by extract-text-webpack-plugin@0.9.1
+            ...
+            ```
+            * 删除不再使用的依赖<br>
+            `webpack-replace`， `webpack-dev-server`， `component-webpack-plugin`， `browser-sync-webpack-plugin`
+            * 升级依赖：`string-replace-webpack-plugin@0.0.5`，[并填坑](https://github.com/CntChen/string-replace-webpack-plugin)
+            * [升级依赖：`extract-text-webpack-plugin`，跟webpack2一起升级](https://webpack.js.org/plugins/extract-text-webpack-plugin/)
+          </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### webpack.config.js 适配 webpack2
+            * OccurenceOrderPlugin<br>
+            OccurenceOrderPlugin is not a constructor
+            `OccurrenceOrderPlugin`可以去掉了，[变成默认选项](https://webpack.js.org/guides/migrating/#occurrenceorderplugin-is-now-on-by-default)
+
+            * configuration has an unknown property 'postcss'<br>
+            webpack2 不允许将 loader 的参数作为 webpack.config 配置的字段，处理方法有两个：
+              * [loader-options-plugin](https://webpack.js.org/plugins/loader-options-plugin/) 作为过渡方案，将webpack1.x 的全局配置写在这个plugin中
+              * 将针对loader的参数写在loader内部
+
+            * configuration.module has an unknown property 'preLoaders'<br>
+            原因： webpack2 的`preLoaders`和`postLoaders`不是独立写的，也统一写在`config.module.rules`中。
+            [rules.enforce](https://webpack.js.org/configuration/module/#rule-enforce)
+          </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### webpack.config.js 适配 webpack2
+            *  configuration.module.noParse should be one of these:[RegExp] | RegExp <br>
+            我们的构建代码有一个地方写错了，直接给`noParse`数组 push 了一个 String。
+
+            * configuration.resolve has an unknown property 'modulesDirectories'<br>
+            `resolve.modulesDirectories`和`resolve.root`都放入了`resolve.modules`中，用途是`Tell webpack what directories should be searched when resolving modules.`<br>
+            参考：[resolve-root-resolve-fallback-resolve-modulesdirectories](https://webpack.js.org/guides/migrating/#resolve-root-resolve-fallback-resolve-modulesdirectories)
+
+            * configuration.resolve.extensions[0] should not be empty<br>
+            This option no longer requires passing an empty string.<br>
+            参考：[resolve-enstensions](https://webpack.js.org/guides/migrating/#resolve-extensions)
+          </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+          * webpack Node API 添加loader级别打包错误提示<br>
+          升级到webpack2后，构建有问题却静默没提示。将 loader 的出错暴露出来是非常关键的。
+          可以了解 loader 的是否兼容 webpack2。
+          ```
+          webpack(webpackConfig, function(err, stats) {
+            // fix error handle https://github.com/shama/webpack-stream/issues/34
+            // if (err) {
+            //   console.log(err);
+            //   self.emit('end');
+            // }
+
+            if (err || stats.hasErrors()) {
+              console.log(err, stats.compilation.errors);
+              self.emit('end');
+            }
+
+            done();
+          });
+          ```
+          </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+          ### Cache 优化
+          参考： https://webpack.js.org/guides/caching/<br>
+          * [webpack-md5-hash](https://github.com/erm0l0v/webpack-md5-hash)<br>
+          `CommonsChunkPlugin`打包的`vendors.js`的`chunkhash`在业务代码更新时候也会变化。[看这里](https://github.com/webpack/webpack/issues/1315).
+
+          * [chunk-manifest-webpack-plugin](https://github.com/soundcloud/chunk-manifest-webpack-plugin)<br>
+          动态加载的`chunks`使用了identifier作为标识，而不是module名称，在代码变化时候，会重新分配id，此时
+          就可能造成代码没变，但是其被引用的id变化了，所以hash也变化了，无法做长缓存。<br>
+          chunk-manifest-webpack-plugin可以生成module命名的chunk，然后用id来映射到插件名称，webpack还是使用id来引用chunk，
+          该模块修改webpack运行是模块化方法，将id转换为module命名的chunk。
+          ```
+          "0":"js/0.42f246f7.chunk.js","1":"js/1.6a4a5650.chunk.js"
+          ```
+          </script>
+        </section>
+      </section>
+      <section>   
+        <section data-markdown>
+          <script type="text/template">
+            ### 存在问题和下一步工作
+            * AggressiveSplittingPlug 分包后无法跟 HTML 结合
+            * AggressiveSplittingPlug 与 extract-text-webpack-plugin 一起用有 [bug](https://github.com/webpack/extract-text-webpack-plugin/issues/323)
+            * webpack2 打包后的动态加载框架使用了 Promise对象，可能不兼容
+            * 知识匮乏
+          </script>
+        </section>
+        <section data-markdown>
+          <script type="text/template">
+            ### 下一步工作
+            * 查看文档，实现分片打包
+            * 了解浏览器加载原理、缓存原理，HTTP2
+            * 验证前端性能是否提升
+          </script>
+        </section>
+      </section>
+      <section>
+        <h2>Q&A</h2>
+      </section>
+    </div>
+  </div>
+  <script src="./reveal/lib/js/head.min.js"></script>
+  <script src="./reveal/js/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      // Display a presentation progress bar
+      progress: true,
+      // Display the page number of the current slide
+      slideNumber: true, 
+      dependencies: 
+      [
+        {
+          src: './reveal/plugin/markdown/marked.js', 
+          condition: function() { 
+            return !!document.querySelector( '[data-markdown]' ); 
+          }
+        },
+        {
+          src: './reveal/plugin/markdown/markdown.js', 
+          condition: function() { 
+            return !!document.querySelector( '[data-markdown]' ); 
+          }
+        },
+        { src: './reveal/plugin/highlight/highlight.js',
+        async: true,
+        callback: function() { 
+          hljs.initHighlightingOnLoad(); } 
+        },    
+      ],
+    });
+    Reveal.configure({ slideNumber: 'c/t' });
+  </script>
+</body>
+
+</html>
